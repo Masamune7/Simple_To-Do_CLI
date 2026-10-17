@@ -1,3 +1,1 @@
-Title | finished | date_added | finished_date 
-Chores | false | 11-Oct-2026 | -
-Clean PC | false | 11-Oct-2026 | -
+Title | finished | date_added | finished_date

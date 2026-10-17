@@ -1,14 +1,5 @@
 /*
 ** Simple CLI To-Do List App **
-
-technology:
--std:io
--std:fs
--crossterm (Terminal Functionalities)
--jiff (Date Time)
--serde
--serde_json
-
 Features:
 - Add todo
 - mark todo as finished
@@ -16,8 +7,6 @@ Features:
 
 Future Plans: 
 - app loop, 
-- string matching, 
-- string saving
 */
 
 use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
@@ -30,33 +19,31 @@ fn main() -> io::Result<()> {
         .create(true)
         .open("todo.txt")?;
     
-    // Prepare reader and read first line
-    print!("Existing line: ");
-    read_file(&f)?;
+    print!("Header: ");
+    read_line(&f)?;
     
     // User input
-    print!("Input Text: ");
-    io::stdout().flush()?;
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
+    let input = user_input();
+
+    f.seek(SeekFrom::End(0))?;
 
     // Write user input
-    write_file(&f, input)?;
+    write_to_file(&f, &input)?;
 
-    // Rewind to the start of the file to read from the beginning
     f.seek(SeekFrom::Start(0))?;
-    print!("Updated file content: ");
-    read_file(&f)?;
+
+    print!("--- Updated File Content ---\n");
+    read_all_lines(&f)?;
 
     Ok(())
 }
 
-fn read_file(f: &File) -> io::Result<()>  {
+fn read_line(f: &File) -> io::Result<()> {
     let mut reader = BufReader::new(f);
     let mut buffer = String::new();
 
     if reader.read_line(&mut buffer)? > 0 {
-        print!("{buffer}"); // print! avoids double newlines since buffer already has \n
+        print!("{buffer}");
     } else {
         println!("(empty file)");
     }
@@ -64,12 +51,45 @@ fn read_file(f: &File) -> io::Result<()>  {
     Ok(())
 }
 
-fn write_file(mut f: &File, input: String) -> io::Result<()>{
-    let mut writer = BufWriter::new(&mut f);
-    writer.write_all(input.as_bytes())?;
-    writer.flush()?;
-    
+fn read_all_lines(f: &File) -> io::Result<()> {
+    let reader = BufReader::new(f);
+    let mut line_number = 0;
+
+    for line in reader.lines() {
+        let content = line?;
+        if line_number == 0{
+            println!("Head: {}", content);
+        } else{
+            println!("{}: {}", line_number, content);
+        }
+        line_number += 1;
+    }
+
+    if line_number == 0 {
+        println!("(empty file)");
+    }
     Ok(())
+}
+
+fn write_to_file(f: &File, input: &str) -> io::Result<()> {
+    let mut writer = BufWriter::new(f);
+
+    // Write the input followed by a newline character
+    writer.write_all(input.as_bytes())?;
+    writer.write_all(b"\n")?;
+
+    writer.flush()?;
+    Ok(())
+}
+
+fn user_input() -> String{
+    print!("\nNew To-Do: ");
+    io::stdout().flush().expect("Failed to flush stdout");
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input).expect("Failed to read input");
+
+    input.trim().to_string()
 }
 
 // #[test]
