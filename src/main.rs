@@ -9,17 +9,21 @@ Future Plans:
 - implement delete 
 */
 
-use std::io::{self, BufRead, BufReader, BufWriter, Seek, SeekFrom, Write};
-use std::fs::{OpenOptions, File};
+mod helper;
+use std::io::{self, BufRead, BufReader, Write, Seek, SeekFrom};
+use std::path::Path;
+use std::fs::{self, OpenOptions, File};
+use helper::{read_line, read_all_lines, write_to_file, user_input};
+
 fn main() -> io::Result<()> {
+    let mut status = true;
+    let filename = "todo.txt";
     // Open file with read, write, and create capabilities
-    let mut f = OpenOptions::new()
+    OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
-        .open("todo.txt")?;
-    
-    let mut status = true;
+        .open(filename)?;
 
     while status {
         println!("\n=============================================================");
@@ -34,10 +38,26 @@ fn main() -> io::Result<()> {
                 println!("\nExiting...");
                 status = false;
             }
-            "1" => read_all_lines(&mut f)?,
-            "2" => create(&mut f)?,
-            "3" => update(),
-            "4" => delete(),
+            "1" => {
+                let mut f = OpenOptions::new().read(true).open(filename)?;
+                read_all_lines(&mut f)?
+            }
+            "2" => {
+                let mut f = OpenOptions::new().read(true).write(true).open(filename)?;
+                create(&mut f)?;
+                read_all_lines(&mut f)?;
+            }
+            "3" => {
+                update()
+            },
+            "4" => {
+                print!("To-Do: ");
+                let context = user_input();
+                delete(filename, &context)?;
+
+                let mut f = OpenOptions::new().read(true).open("todo.txt")?;
+                read_all_lines(&mut f)?;
+            }
             _ => {
                 println!("\n[X] Invalid option! Please enter a number between 0 and 4")
             }
@@ -47,66 +67,7 @@ fn main() -> io::Result<()> {
     Ok(())
 }
 
-fn read_line(f: &File) -> io::Result<()> {
-    let mut reader = BufReader::new(f);
-    let mut buffer = String::new();
-
-    if reader.read_line(&mut buffer)? > 0 {
-        print!("{buffer}");
-    } else {
-        println!("(empty file)");
-    }
-
-    Ok(())
-}
-
-fn read_all_lines(f: &mut File) -> io::Result<()> {
-    f.seek(SeekFrom::Start(0))?;
-
-    let reader = BufReader::new(f);
-    let mut line_number = 0;
-
-    println!("\n--- Current To-Do List ---");
-
-    for line in reader.lines() {
-        let content = line?;
-        if line_number == 0{
-            println!("\nHead: {}", content);
-        } else{
-            println!("{}: {}", line_number, content);
-        }
-        line_number += 1;
-    }
-
-    if line_number == 0 {
-        println!("(empty file)");
-    }
-
-    println!("--------------------------");
-    Ok(())
-}
-
-fn write_to_file(f: &File, input: &str) -> io::Result<()> {
-    let mut writer = BufWriter::new(f);
-
-    // Write the input followed by a newline character
-    writer.write_all(input.as_bytes())?;
-    writer.write_all(b"\n")?;
-
-    writer.flush()?;
-    Ok(())
-}
-
-fn user_input() -> String{
-    io::stdout().flush().expect("Failed to flush stdout");
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input).expect("Failed to read input");
-
-    input.trim().to_string()
-}
-
-fn create(f: &mut File)-> io::Result<()> {
+fn create(f: &mut File) -> io::Result<()> {
     println!("\n--- Create New Task ---");
     f.seek(SeekFrom::Start(0))?;
     print!("Current Header: ");
@@ -117,12 +78,9 @@ fn create(f: &mut File)-> io::Result<()> {
     let input = user_input();
     
     f.seek(SeekFrom::End(0))?;
-
-    // Write user input
     write_to_file(f, &input)?;
 
     print!("\n[✓] Task successfully added!");
-    read_all_lines(f)?;
 
     Ok(())
 }
@@ -131,8 +89,52 @@ fn update(){
     println!("\n[!] Update not implemented yet")
 }
 
-fn delete(){
-    println!("\n[!] Delete not implemented yet")
+fn delete(path: &str, context: &str) -> io::Result<()>{
+    let path_real = Path::new(path);
+    let path_tmp = path_real.with_extension("tmp");
+
+    let f_src = File::open(path_real)?;
+    let reader = BufReader::new(f_src);
+
+    let target_context = context.to_lowercase().trim().to_string();
+    let mut found_line = false;
+    let mut empty = true;
+
+    let mut f_tmp = OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(&path_tmp)?; 
+
+    for line in reader.lines() {
+        empty = false;
+        let content = line?;
+        let clean_content = content.to_lowercase();
+
+        if !found_line && clean_content.trim().contains(&target_context) {
+            found_line = true;
+            continue; 
+        }
+
+        writeln!(f_tmp, "{}", content)?;
+    }
+
+    if empty {
+        println!("(empty file)");
+    }
+
+    f_tmp.flush()?;
+
+    fs::rename(path_tmp, path_real)?;
+
+    if found_line {
+        println!("\n[✓] Task successfully deleted!");
+    } else {
+        println!("\n[X] Task not found!");
+    }
+
+    println!("--------------------------");
+    Ok(())
 }
 
 // #[test]
