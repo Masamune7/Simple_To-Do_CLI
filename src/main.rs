@@ -18,7 +18,7 @@ use helper::{read_line, read_all_lines, write_to_file, user_input};
 fn main() -> io::Result<()> {
     let mut status = true;
     let filename = "todo.txt";
-    // Open file with read, write, and create capabilities
+
     OpenOptions::new()
         .read(true)
         .write(true)
@@ -48,10 +48,15 @@ fn main() -> io::Result<()> {
                 read_all_lines(&mut f)?;
             }
             "3" => {
-                update()
+                print!("Old Task: ");
+                let context = user_input();
+                update(filename, &context)?;
+
+                let mut f = OpenOptions::new().read(true).open("todo.txt")?;
+                read_all_lines(&mut f)?;
             },
             "4" => {
-                print!("To-Do: ");
+                print!("Task: ");
                 let context = user_input();
                 delete(filename, &context)?;
 
@@ -85,8 +90,59 @@ fn create(f: &mut File) -> io::Result<()> {
     Ok(())
 }
 
-fn update(){
-    println!("\n[!] Update not implemented yet")
+fn update(path: &str, context: &str) -> io::Result<()> {
+    let path_real = Path::new(path);
+    let path_tmp = path_real.with_extension("tmp");
+
+    let f_src = File::open(path_real)?;
+    let reader = BufReader::new(f_src);
+
+    let target_context = context.to_lowercase().trim().to_string();
+    let mut found_line = false;
+    let mut empty = true;
+
+    {
+
+        let mut f_tmp = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&path_tmp)?; 
+
+        for line in reader.lines() {
+            empty = false;
+            let content = line?;
+            let clean_content = content.to_lowercase();
+
+            if !found_line && clean_content.trim().contains(&target_context) {
+                found_line = true;
+                print!("Update task: ");
+                let new_line = user_input();
+                writeln!(f_tmp, "{}", new_line)?;
+                continue;
+            }
+
+            writeln!(f_tmp, "{}", content)?;
+        }
+        
+        f_tmp.flush()?;
+
+    }
+
+    if empty {
+        println!("(empty file)");
+    }
+
+    fs::rename(path_tmp, path_real)?;
+
+    if found_line {
+        println!("\n[✓] Task successfully updated!");
+    } else {
+        println!("\n[X] Task not found!");
+    }
+
+    println!("--------------------------");
+    Ok(())
 }
 
 fn delete(path: &str, context: &str) -> io::Result<()>{
@@ -100,30 +156,32 @@ fn delete(path: &str, context: &str) -> io::Result<()>{
     let mut found_line = false;
     let mut empty = true;
 
-    let mut f_tmp = OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&path_tmp)?; 
+    {
+        let mut f_tmp = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&path_tmp)?; 
 
-    for line in reader.lines() {
-        empty = false;
-        let content = line?;
-        let clean_content = content.to_lowercase();
+        for line in reader.lines() {
+            empty = false;
+            let content = line?;
+            let clean_content = content.to_lowercase();
 
-        if !found_line && clean_content.trim().contains(&target_context) {
-            found_line = true;
-            continue; 
+            if !found_line && clean_content.trim().contains(&target_context) {
+                found_line = true;
+                continue; 
+            }
+
+            writeln!(f_tmp, "{}", content)?;
         }
-
-        writeln!(f_tmp, "{}", content)?;
+        f_tmp.flush()?;
     }
 
     if empty {
         println!("(empty file)");
     }
 
-    f_tmp.flush()?;
 
     fs::rename(path_tmp, path_real)?;
 
