@@ -16,15 +16,21 @@ use std::fs::{self, OpenOptions, File};
 use helper::{read_line, read_all_lines, write_to_file, user_input};
 
 fn main() -> io::Result<()> {
-    let mut status = true;
     let filename = "todo.txt";
+    let path = Path::new(filename);
 
-    OpenOptions::new()
-        .read(true)
+    let mut file = OpenOptions::new()
         .write(true)
         .create(true)
+        .append(true)
         .open(filename)?;
 
+    // Only write the header if the file didn't exist or is empty
+    if !path.exists() || file.metadata()?.len() == 0 {
+        file.write_all(b"Title | finished | date_added | finished_date\n")?;
+    }
+
+    let mut status = true;
     while status {
         println!("\n=============================================================");
         println!("  OPTIONS: 1.View | 2.Create | 3.Update | 4.Delete | 0.Exit   ");
