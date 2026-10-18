@@ -1,12 +1,10 @@
 /*
 ** Simple CLI To-Do List App **
 Features:
-- View Todo
-- Add Todo
-
-Future Plans: 
-- implement Update,
-- implement delete 
+- View Task
+- Add Task
+- Update Task
+- Delete Task
 */
 
 mod helper;
